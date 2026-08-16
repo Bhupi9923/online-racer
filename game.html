@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Online Racer V2</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="menu">
+<h1>ONLINE RACER</h1>
+
+<div id="garage">
+<button data-car="red">🔴 Falcon</button>
+<button data-car="blue">🔵 Frost</button>
+<button data-car="yellow">🟡 Volt</button>
+<button data-car="black">⚫ Shadow</button>
+</div>
+
+<button id="play">PLAY</button>
+</div>
+
+<canvas id="game"></canvas>
+
+<div id="hud">
+<div>⚡ <span id="nitro">100</span>%</div>
+<div>🏎️ <span id="speed">0</span> km/h</div>
+<div>⏱️ <span id="timer">0.0</span>s</div>
+</div>
+
+<div id="mobile">
+<button id="left">⬅️</button>
+<button id="boost">⚡</button>
+<button id="right">➡️</button>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
