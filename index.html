@@ -4,68 +4,94 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Online Racer</title>
+
 <style>
-*{margin:0;padding:0;box-sizing:border-box;font-family:Arial,sans-serif}
+*{margin:0;padding:0;box-sizing:border-box;font-family:Arial,sans-serif;}
+
 body{
 background:linear-gradient(#1a1a1a,#000);
-height:100vh;
+color:white;
 display:flex;
 justify-content:center;
 align-items:center;
-color:white;
+min-height:100vh;
+padding:20px;
 }
+
 .container{
-width:360px;
+width:390px;
 background:#222;
-padding:30px;
+padding:20px;
 border-radius:20px;
 text-align:center;
-box-shadow:0 0 25px rgba(0,255,255,.3);
+box-shadow:0 0 25px rgba(0,255,255,.35);
 }
-h1{color:#00e5ff;margin-bottom:20px;}
-.car{font-size:60px;margin-bottom:15px;}
+
+h1{
+color:#00e5ff;
+margin-bottom:15px;
+}
+
 button{
 width:100%;
-padding:15px;
-margin:10px 0;
-font-size:18px;
+padding:14px;
+margin:8px 0;
 border:none;
 border-radius:12px;
 cursor:pointer;
+font-size:17px;
 font-weight:bold;
 }
+
 #create{background:#00c853;color:white;}
 #join{background:#2979ff;color:white;}
+
 input{
 width:100%;
-padding:15px;
-font-size:18px;
-border-radius:12px;
+padding:14px;
 border:none;
+border-radius:12px;
+font-size:18px;
 text-align:center;
 letter-spacing:4px;
 }
+
 #roomBox{
 display:none;
-margin-top:20px;
-background:#111;
+margin-top:15px;
 padding:15px;
+background:#111;
 border-radius:12px;
 }
+
 #roomCode{
-font-size:42px;
+font-size:38px;
 color:#00e5ff;
-letter-spacing:6px;
 margin:10px 0;
+letter-spacing:5px;
 }
-#status{margin-top:12px;color:#bbb;}
+
+#status{
+color:#bbb;
+margin-top:10px;
+}
+
+canvas{
+margin-top:20px;
+width:100%;
+max-width:360px;
+background:#555;
+border-radius:12px;
+display:none;
+}
 </style>
 </head>
+
 <body>
 
 <div class="container">
-<div class="car">🏎️</div>
-<h1>Online Racer</h1>
+
+<h1>🏎️ Online Racer</h1>
 
 <button id="create" onclick="createRoom()">Create Room</button>
 
@@ -78,9 +104,13 @@ margin:10px 0;
 <div id="roomCode">----</div>
 <div id="status">Waiting for Player 2...</div>
 </div>
+
+<canvas id="game" width="360" height="600"></canvas>
+
 </div>
 
 <script type="module">
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
 import {
 getDatabase,
@@ -91,41 +121,54 @@ update,
 onValue
 } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js";
 
-// Your Firebase configuration
-const firebaseConfig = {
-apiKey: "AIzaSyCupFk6Pl7lcIMfkEG5mgj-pPSXd7fHGJ0",
-authDomain: "online-racer-a0464.firebaseapp.com",
-databaseURL: "https://online-racer-a0464-default-rtdb.firebaseio.com",
-projectId: "online-racer-a0464",
-storageBucket: "online-racer-a0464.firebasestorage.app",
-messagingSenderId: "2178448228",
-appId: "1:2178448228:web:8e526e5292a576cc669871",
-measurementId: "G-1JDWRWYNBJ"
+const firebaseConfig={
+apiKey:"AIzaSyCupFk6Pl7lcIMfkEG5mgj-pPSXd7fHGJ0",
+authDomain:"online-racer-a0464.firebaseapp.com",
+databaseURL:"https://online-racer-a0464-default-rtdb.firebaseio.com",
+projectId:"online-racer-a0464",
+storageBucket:"online-racer-a0464.firebasestorage.app",
+messagingSenderId:"2178448228",
+appId:"1:2178448228:web:8e526e5292a576cc669871"
 };
 
 const app=initializeApp(firebaseConfig);
 const db=getDatabase(app);
 
 let room="";
+let player="";
+let players={};
 
-// Create Room
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+
+const keys={};
+
+document.addEventListener("keydown",e=>keys[e.key]=true);
+document.addEventListener("keyup",e=>keys[e.key]=false);
+
 window.createRoom=async function(){
 
 room=Math.floor(1000+Math.random()*9000).toString();
 
+player="host";
+
 await set(ref(db,"rooms/"+room),{
-host:true,
-guest:false,
-started:false
+players:{
+host:{
+x:120,
+y:520,
+color:"red"
+}
+}
 });
 
 document.getElementById("roomCode").textContent=room;
 document.getElementById("roomBox").style.display="block";
 
-watchRoom(room);
+watchRoom();
+
 }
 
-// Join Room
 window.joinRoom=async function(){
 
 const code=document.getElementById("joinInput").value.trim();
@@ -142,35 +185,109 @@ alert("Room not found.");
 return;
 }
 
-await update(ref(db,"rooms/"+code),{
-guest:true
-});
-
 room=code;
+player="guest";
+
+await update(ref(db,"rooms/"+room+"/players"),{
+guest:{
+x:240,
+y:520,
+color:"deepskyblue"
+}
+});
 
 document.getElementById("roomCode").textContent=room;
 document.getElementById("roomBox").style.display="block";
-document.getElementById("status").textContent="Connected!";
 
-watchRoom(room);
+watchRoom();
+
 }
 
-// Watch Room
-function watchRoom(code){
+function watchRoom(){
 
-onValue(ref(db,"rooms/"+code),snap=>{
+onValue(ref(db,"rooms/"+room+"/players"),snap=>{
 
-const data=snap.val();
+players=snap.val()||{};
 
-if(!data)return;
-
-if(data.guest){
-document.getElementById("status").textContent="🎉 Player 2 Connected!";
+if(players.host&&players.guest){
+document.getElementById("status").textContent="🎉 Both Players Connected!";
+canvas.style.display="block";
 }else{
 document.getElementById("status").textContent="Waiting for Player 2...";
 }
+
 });
+
 }
+
+async function updatePlayer(){
+
+if(!room||!player||!players[player])return;
+
+const p={...players[player]};
+
+if(keys["ArrowLeft"])p.x-=4;
+if(keys["ArrowRight"])p.x+=4;
+if(keys["ArrowUp"])p.y-=4;
+if(keys["ArrowDown"])p.y+=4;
+
+p.x=Math.max(40,Math.min(320,p.x));
+p.y=Math.max(30,Math.min(570,p.y));
+
+await update(ref(db,"rooms/"+room+"/players/"+player),p);
+
+}
+
+let roadOffset=0;
+
+function drawRoad(){
+
+roadOffset=(roadOffset+4)%40;
+
+ctx.fillStyle="#444";
+ctx.fillRect(0,0,360,600);
+
+ctx.fillStyle="white";
+ctx.fillRect(30,0,5,600);
+ctx.fillRect(325,0,5,600);
+
+ctx.fillStyle="yellow";
+
+for(let y=-40;y<640;y+=40){
+ctx.fillRect(177,y+roadOffset,6,20);
+}
+
+}
+
+function drawCar(p){
+
+ctx.fillStyle=p.color;
+
+ctx.fillRect(p.x-16,p.y-28,32,56);
+
+ctx.fillStyle="black";
+ctx.fillRect(p.x-12,p.y-18,24,12);
+
+ctx.fillStyle="white";
+ctx.fillRect(p.x-10,p.y+18,8,8);
+ctx.fillRect(p.x+2,p.y+18,8,8);
+
+}
+
+async function gameLoop(){
+
+drawRoad();
+
+Object.values(players).forEach(drawCar);
+
+await updatePlayer();
+
+requestAnimationFrame(gameLoop);
+
+}
+
+gameLoop();
+
 </script>
 
 </body>
